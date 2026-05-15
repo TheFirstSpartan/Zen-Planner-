@@ -1,0 +1,21 @@
+{
+  "name": "Zen Planner Arcade",
+  "short_name": "ZenPlanner",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#39ff14",
+  "description": "Minimalist productivity with an arcade aesthetic.",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/39ff14/000000?text=Zen",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/39ff14/000000?text=Zen",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
