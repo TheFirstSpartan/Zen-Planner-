@@ -67,31 +67,71 @@
             </ul>
     </div>
 
-    <script>
-        function addTask() {
-            const input = document.getElementById('taskInput');
-            const list = document.getElementById('taskList');
-            
-            if (input.value.trim() === '') return;
-
-            const li = document.createElement('li');
-            li.className = "arcade-border p-4 flex justify-between items-center bg-zinc-900 animate-pulse";
-            li.innerHTML = `
-                <span class="text-xl">${input.value}</span>
-                <button onclick="this.parentElement.remove()" class="text-red-500 border border-red-500 px-2">X</button>
-            `;
-            
-            list.appendChild(li);
-            input.value = '';
-            
-            // Remove pulse after animation
-            setTimeout(() => li.classList.remove('animate-pulse'), 1000);
-        }
-
-        // Allow "Enter" key to add task
-        document.getElementById('taskInput').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') addTask();
+   <script>
+    // 1. DATA PERSISTENCE: Save to Disk
+    function saveToDisk() {
+        const list = document.getElementById('taskList');
+        const tasks = [];
+        
+        // Find all the spans (where the task text lives)
+        list.querySelectorAll('span').forEach(span => {
+            tasks.push(span.innerText);
         });
-    </script>
-</body>
-</html>
+        
+        // Save to browser memory
+        localStorage.setItem('zenTasks', JSON.stringify(tasks));
+        console.log("Archive Updated: Tasks saved to local storage.");
+    }
+
+    // 2. DATA PERSISTENCE: Load from Disk
+    function loadFromDisk() {
+        const saved = localStorage.getItem('zenTasks');
+        if (!saved) return;
+
+        const tasks = JSON.parse(saved);
+        tasks.forEach(taskText => {
+            renderTask(taskText);
+        });
+        console.log("Archive Loaded: Found " + tasks.length + " tasks.");
+    }
+
+    // 3. UI GENERATOR: Create Task Element
+    function renderTask(taskText) {
+        const list = document.getElementById('taskList');
+        const li = document.createElement('li');
+        
+        // Keeping your Neo Geo / Arcade styling
+        li.className = "arcade-border p-4 flex justify-between items-center bg-zinc-900 mb-4 animate-pulse";
+        li.innerHTML = `
+            <span class="text-xl">${taskText}</span>
+            <button onclick="this.parentElement.remove(); saveToDisk();" class="text-red-500 border border-red-500 px-2 btn-press">X</button>
+        `;
+        
+        list.appendChild(li);
+        
+        // Remove pulse after 1 second
+        setTimeout(() => li.classList.remove('animate-pulse'), 1000);
+    }
+
+    // 4. MAIN ACTION: Add Task
+    function addTask() {
+        const input = document.getElementById('taskInput');
+        const taskValue = input.value.trim();
+        
+        if (taskValue === '') return;
+
+        renderTask(taskValue);
+        saveToDisk(); // Save immediately
+        
+        input.value = '';
+        input.focus();
+    }
+
+    // Listen for the "Enter" key
+    document.getElementById('taskInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') addTask();
+    });
+
+    // BOOT SEQUENCE: Load tasks as soon as the page opens
+    window.onload = loadFromDisk;
+</script>
