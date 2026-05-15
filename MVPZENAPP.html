@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Planner - Arcade Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --dynamic-accent: #8B5CF6;
+            --dynamic-yellow: #FFD700;
+            --dynamic-cyan: #00F5FF;
+            --bg-color: #ffffff;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --border-color: #1e293b;
+            --cycle-color: #FFD700;
+            --dot-color: rgba(124, 58, 237, 0.2);
+        }
+
+        .dark-mode {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --border-color: #f1f5f9;
+            --dot-color: rgba(255, 215, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            background-image: radial-gradient(var(--dot-color) 2px, transparent 2px);
+            background-size: 30px 30px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            transition: background-color 0.5s ease;
+        }
+
+        .neo-card {
+            background: var(--card-bg);
+            border: 4px solid var(--border-color);
+            box-shadow: 10px 10px 0px 0px var(--border-color);
+            transition: transform 0.2s ease;
+        }
+
+        .btn-arcade {
+            background-color: var(--cycle-color);
+            color: #000;
+            border: 4px solid var(--border-color);
+            box-shadow: 0px 6px 0px 0px var(--border-color);
+            transition: all 0.1s ease;
+            cursor: pointer;
+        }
+
+        .btn-arcade:active {
+            transform: translateY(3px);
+            box-shadow: 0px 3px 0px 0px var(--border-color);
+        }
+
+        .btn-white {
+            background-color: #ffffff;
+            color: #000;
+            border: 4px solid var(--border-color);
+            box-shadow: 0px 6px 0px 0px var(--border-color);
+        }
+
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .mission-item {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .mission-cleared {
+            background-color: var(--cycle-color) !important;
+            border-color: var(--border-color) !important;
+            color: #000 !important;
+        }
+
+        .mission-cleared::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: #ff0000;
+            transform: translateY(-50%) scaleX(0);
+            transform-origin: left;
+            animation: strikeThrough 0.3s forwards;
+            z-index: 10;
+        }
+
+        @keyframes strikeThrough {
+            to { transform: translateY(-50%) scaleX(1); }
+        }
+
+        .winner-glow {
+            animation: winner-pulse 1.5s infinite;
+        }
+
+        /* Clean pulse with no box shadow */
+        @keyframes winner-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+
+        .emoji-cycle-fade {
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 24px;
+            width: 24px;
+            border-radius: 50%;
+            background: var(--cycle-color);
+            border: 3px solid var(--border-color);
+            cursor: pointer;
+            margin-top: -8px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 12px;
+            background: var(--border-color);
+            border-radius: 6px;
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 8px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <main class="w-full max-w-md p-4">
+        <div id="app-content" class="neo-card rounded-[32px] p-8 min-h-[750px] flex flex-col relative overflow-hidden">
+            
+            <header class="flex justify-between items-center mb-8 relative z-10">
+                <h1 class="text-3xl font-black italic tracking-tighter uppercase">
+                    ZEN <span id="header-accent" class="text-[var(--cycle-color)]">PLANNER</span>
+                </h1>
+                <button onclick="toggleTheme()" class="w-12 h-12 flex items-center justify-center border-4 border-[var(--border-color)] rounded-xl bg-white dark:bg-slate-800" id="theme-btn">🌙</button>
+            </header>
+
+            <div id="accent-line" class="h-2 w-32 mb-10" style="background-color: var(--cycle-color); border: 2px solid var(--border-color);"></div>
+
+            <div id="view-container" class="flex-grow flex flex-col relative z-10"></div>
+            
+            <audio id="bgm-player" loop></audio>
+        </div>
+    </main>
+
+    <script>
+        window.state = {
+            phase: 'splash',
+            onboardingStep: 0,
+            bgmName: null,
+            emojiIndex: 0,
+            allTasks: JSON.parse(localStorage.getItem('zen_planner_tasks')) || [],
+            theme: localStorage.getItem('zen_planner_theme') || 'light',
+            energyLevel: localStorage.getItem('zen_planner_energy') || 50,
+            selectedTasks: [],
+            timerSeconds: 25 * 60,
+            timerRunning: false,
+            timerInterval: null
+        };
+
+        const zenEmojis = [
+            "🧘", "✨", "🕯️", "👁️", "☁️", "🎋", "🍃", "⛰️", "🌊", "🌸", 
+            "🌑", "🪵", "🍵", "🎐", "🐚", "⚪", "🧹", "⛩️", "🏮", "🏯"
+        ];
+
+        function startEmojiCycle() {
+            const emojiEl = document.getElementById('cycling-emoji');
+            if (!emojiEl) return;
+            
+            if (window.emojiInterval) clearInterval(window.emojiInterval);
+            
+            window.emojiInterval = setInterval(() => {
+                const el = document.getElementById('cycling-emoji');
+                if (el) {
+                    el.style.opacity = 0;
+                    setTimeout(() => {
+                        state.emojiIndex = (state.emojiIndex + 1) % zenEmojis.length;
+                        el.innerText = zenEmojis[state.emojiIndex];
+                        el.style.opacity = 1;
+                    }, 500);
+                }
+            }, 3000);
+        }
+
+        const onboardingContent = [
+            { title: "Less is More", emoji: "🧘", text: "We suffer because we have too many choices. Focus on the vital few." },
+            { title: "The Rule of 3", emoji: "✨", text: "Pick only 3 missions. Lock them in. The rest stay in the vault." },
+            { title: "Energy Gauge", emoji: "🔋", text: "Set your fuel level. We suggest meals and movement to match your vibe." }
+        ];
+
+        const workouts = { 
+            low: { text: "Light Stretching", emoji: "🧘‍♂️" }, 
+            mid: { text: "Bodyweight Circuit", emoji: "💪" }, 
+            high: { text: "High Intensity Cardio", emoji: "⚡" } 
+        };
+        const meals = { 
+            low: { text: "Yogurt & Berries", emoji: "🍏" }, 
+            mid: { text: "Quinoa Bowl", emoji: "🥗" }, 
+            high: { text: "Proteins & Greens", emoji: "🍱" } 
+        };
+
+        function saveData() {
+            localStorage.setItem('zen_planner_tasks', JSON.stringify(state.allTasks));
+            localStorage.setItem('zen_planner_theme', state.theme);
+            localStorage.setItem('zen_planner_energy', state.energyLevel);
+        }
+
+        window.toggleTheme = () => {
+            state.theme = state.theme === 'light' ? 'dark' : 'light';
+            saveData();
+            applyTheme();
+        };
+
+        function applyTheme() {
+            const btn = document.getElementById('theme-btn');
+            document.body.classList.toggle('dark-mode', state.theme === 'dark');
+            if (btn) btn.innerText = state.theme === 'dark' ? '☀️' : '🌙';
+        }
+
+        window.addTask = () => {
+            const input = document.getElementById('task-input');
+            if (input?.value.trim()) {
+                state.allTasks.unshift(input.value.trim());
+                saveData();
+                input.value = '';
+                render();
+            }
+        };
+
+        window.toggleSelection = (task) => {
+            const index = state.selectedTasks.findIndex(t => t.text === task);
+            if (index > -1) {
+                state.selectedTasks.splice(index, 1);
+            } else if (state.selectedTasks.length < 3) {
+                state.selectedTasks.push({ text: task, completed: false });
+            }
+            render();
+        };
+
+        window.toggleMissionComplete = (index) => {
+            state.selectedTasks[index].completed = !state.selectedTasks[index].completed;
+            const allDone = state.selectedTasks.every(t => t.completed);
+            if (allDone) {
+                setTimeout(() => { state.phase = 'victory'; render(); }, 600);
+            } else {
+                render();
+            }
+        };
+
+        window.toggleTimer = () => {
+            if (state.timerRunning) {
+                clearInterval(state.timerInterval);
+                state.timerRunning = false;
+                document.getElementById('bgm-player').pause();
+            } else {
+                state.timerRunning = true;
+                const audio = document.getElementById('bgm-player');
+                if (audio && state.bgmUrl) {
+                    audio.src = state.bgmUrl;
+                    audio.play();
+                }
+                state.timerInterval = setInterval(() => {
+                    if (state.timerSeconds > 0) {
+                        state.timerSeconds--;
+                        updateTimerUI();
+                    } else {
+                        clearInterval(state.timerInterval);
+                        state.timerRunning = false;
+                    }
+                }, 1000);
+            }
+            render();
+        };
+
+        function updateTimerUI() {
+            const el = document.getElementById('timer-display');
+            if (el) el.innerText = formatTime(state.timerSeconds);
+        }
+
+        function formatTime(s) {
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        window.handleMusicUpload = (e) => {
+            const file = e.target?.files?.[0];
+            if (file) {
+                state.bgmName = file.name;
+                state.bgmUrl = URL.createObjectURL(file);
+                render();
+            }
+        };
+
+        window.render = function() {
+            const container = document.getElementById('view-container');
+            if (!container) return;
+
+            if (state.phase === 'splash') {
+                container.innerHTML = `
+                    <div class="fade-in flex flex-col items-center justify-center flex-grow space-y-12 text-center">
+                        <div id="cycling-emoji" class="text-[120px] select-none winner-glow emoji-cycle-fade">${zenEmojis[state.emojiIndex]}</div>
+                        <h2 class="text-3xl font-black uppercase italic tracking-widest text-[var(--text-primary)]">FIND YOUR CENTER</h2>
+                        <button onclick="state.phase='onboarding'; render();" class="w-full btn-arcade py-5 font-black uppercase rounded-2xl text-xl italic">GET STARTED</button>
+                    </div>`;
+                
+                setTimeout(startEmojiCycle, 100);
+            } 
+            
+            else if (state.phase === 'onboarding') {
+                const step = onboardingContent[state.onboardingStep];
+                container.innerHTML = `
+                    <div class="fade-in flex flex-col items-center text-center space-y-8 h-full">
+                        <div class="text-8xl py-12">${step.emoji}</div>
+                        <div>
+                            <h2 class="text-3xl font-black uppercase italic">${step.title}</h2>
+                            <p class="text-sm font-bold opacity-60 mt-6 px-4 uppercase">${step.text}</p>
+                        </div>
+                        <button onclick="state.onboardingStep < onboardingContent.length - 1 ? (state.onboardingStep++, render()) : (state.phase='planning', render())" class="w-full btn-arcade py-5 font-black uppercase rounded-2xl mt-auto">CONTINUE</button>
+                    </div>`;
+            }
+
+            else if (state.phase === 'planning') {
+                container.innerHTML = `
+                    <div class="fade-in flex flex-col space-y-6 h-full">
+                        <div class="flex gap-2">
+                            <input id="task-input" placeholder="BRAIN DUMP..." class="flex-grow border-4 border-[var(--border-color)] p-4 font-black rounded-xl dark:bg-slate-900 focus:outline-none uppercase">
+                            <button onclick="addTask()" class="btn-arcade w-16 text-3xl font-black">+</button>
+                        </div>
+                        
+                        <h3 class="text-[10px] font-black uppercase opacity-60">Mission Vault (${state.allTasks.length})</h3>
+
+                        <div class="space-y-3 flex-grow overflow-y-auto custom-scroll pr-2">
+                            ${state.allTasks.length ? state.allTasks.map((t, i) => `
+                                <div class="bg-white dark:bg-slate-800 border-4 border-[var(--border-color)] p-4 rounded-xl font-black text-sm uppercase italic flex justify-between items-center group">
+                                    <span>${t}</span>
+                                    <button onclick="state.allTasks.splice(${i}, 1); saveData(); render();" class="opacity-0 group-hover:opacity-100 text-red-500">✕</button>
+                                </div>
+                            `).join('') : '<div class="opacity-20 font-black italic uppercase py-20 text-center">Empty Buffer</div>'}
+                        </div>
+
+                        <button onclick="state.phase='selection'; render();" class="w-full btn-arcade py-5 font-black uppercase rounded-2xl">SELECT TOP 3</button>
+                    </div>`;
+            }
+
+            else if (state.phase === 'selection') {
+                container.innerHTML = `
+                    <div class="fade-in flex flex-col space-y-6 h-full">
+                        <h2 class="text-xl font-black uppercase italic text-center">CHOOSE YOUR FOCUS (${state.selectedTasks.length}/3)</h2>
+                        <div class="space-y-3 flex-grow overflow-y-auto custom-scroll pr-2">
+                            ${state.allTasks.map(t => {
+                                const isSelected = state.selectedTasks.some(st => st.text === t);
+                                return `<div onclick="window.toggleSelection('${t.replace(/'/g, "\\'")}')" class="cursor-pointer border-4 p-4 rounded-xl font-black uppercase transition-all ${isSelected ? 'bg-[var(--dynamic-cyan)] scale-95' : 'bg-white dark:bg-slate-900'} border-[var(--border-color)]">${t}</div>`
+                            }).join('')}
+                        </div>
+                        <button onclick="state.selectedTasks.length === 3 ? (state.phase='energy', render()) : null" class="w-full ${state.selectedTasks.length === 3 ? 'btn-arcade' : 'bg-slate-300 opacity-50 cursor-not-allowed'} py-5 font-black uppercase rounded-2xl">CALIBRATE</button>
+                    </div>`;
+            }
+
+            else if (state.phase === 'energy') {
+                container.innerHTML = `
+                    <div class="fade-in flex flex-col space-y-12 h-full justify-center">
+                        <div class="text-center">
+                            <h2 class="text-4xl font-black uppercase italic">ENERGY LEVEL</h2>
+                            <p class="text-[10px] font-black opacity-60">SYNCING VITAL SIGNS</p>
+                        </div>
+                        <div class="space-y-8 px-4">
+                            <input type="range" min="0" max="100" value="${state.energyLevel}" oninput="state.energyLevel=this.value; render(); saveData();" class="w-full">
+                            <div class="flex justify-between font-black uppercase italic text-xl">
+                                <span class="${state.energyLevel < 33 ? 'text-blue-500' : 'opacity-20'}">LOW</span>
+                                <span class="${state.energyLevel >= 33 && state.energyLevel < 66 ? 'text-yellow-500' : 'opacity-20'}">MID</span>
+                                <span class="${state.energyLevel >= 66 ? 'text-red-500' : 'opacity-20'}">HIGH</span>
+                            </div>
+                        </div>
+                        <button onclick="state.phase='focus'; render();" class="w-full btn-arcade py-5 font-black uppercase rounded-2xl">INITIALIZE</button>
+                    </div>`;
+            }
+
+            else if (state.phase === 'focus') {
+                const energyKey = state.energyLevel < 33 ? 'low' : (state.energyLevel < 66 ? 'mid' : 'high');
+                container.innerHTML = `
+                    <div class="fade-in flex flex-col space-y-6 h-full">
+                        <div class="text-center">
+                            <div id="timer-display" class="text-6xl font-black tracking-widest font-mono italic">${formatTime(state.timerSeconds)}</div>
+                            <div class="flex justify-center gap-4 mt-6">
+                                <button onclick="toggleTimer()" class="btn-arcade px-8 py-2 rounded-xl font-black uppercase text-sm">${state.timerRunning ? 'PAUSE' : 'START'}</button>
+                                <button onclick="state.timerSeconds = 25*60; render();" class="btn-white px-8 py-2 rounded-xl font-black uppercase text-sm">RESET</button>
+                            </div>
+                        </div>
+
+                        <div class="border-4 border-[var(--border-color)] rounded-2xl p-4 bg-slate-50 dark:bg-slate-800">
+                            <span class="text-[10px] font-black uppercase opacity-60">BGM: ${state.bgmName || 'SILENCE'}</span>
+                            <input type="file" id="bgm-upload" accept="audio/*" class="hidden" onchange="handleMusicUpload(event)">
+                            <button onclick="document.getElementById('bgm-upload').click()" class="mt-2 w-full bg-white dark:bg-slate-700 p-2 rounded-lg border-2 border-[var(--border-color)] text-[10px] font-black uppercase">UPLOAD BEATS</button>
+                        </div>
+
+                        <div class="space-y-4">
+                            ${state.selectedTasks.map((t, i) => `
+                                <div onclick="toggleMissionComplete(${i})" class="mission-item border-4 p-4 rounded-xl font-black uppercase cursor-pointer ${t.completed ? 'mission-cleared' : 'bg-white dark:bg-slate-900 border-[var(--border-color)]'}">
+                                    ${t.text}
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="mt-auto grid grid-cols-2 gap-4">
+                            <div class="border-4 border-[var(--border-color)] p-3 rounded-xl">
+                                <span class="block text-[8px] font-black uppercase opacity-50">FUEL</span>
+                                <span class="text-xs font-black uppercase">${meals[energyKey].emoji} ${meals[energyKey].text}</span>
+                            </div>
+                            <div class="border-4 border-[var(--border-color)] p-3 rounded-xl">
+                                <span class="block text-[8px] font-black uppercase opacity-50">MOVE</span>
+                                <span class="text-xs font-black uppercase">${workouts[energyKey].emoji} ${workouts[energyKey].text}</span>
+                            </div>
+                        </div>
+                        
+                        <button onclick="state.phase='planning'; state.selectedTasks=[]; render();" class="text-[10px] font-black uppercase opacity-40">ABORT MISSION</button>
+                    </div>`;
+            }
+
+            else if (state.phase === 'victory') {
+                container.innerHTML = `
+                    <div class="fade-in flex flex-col items-center justify-center flex-grow text-center space-y-12">
+                        <div class="text-[120px] winner-glow">🏆</div>
+                        <div>
+                            <h2 class="text-4xl font-black uppercase italic">STAGE CLEAR!</h2>
+                            <p class="text-sm font-bold opacity-60 mt-4 uppercase">Peace restored to the neural network.</p>
+                        </div>
+                        <button onclick="state.phase='planning'; state.selectedTasks=[]; render();" class="w-full btn-arcade py-5 font-black uppercase rounded-2xl">NEXT ROUND</button>
+                    </div>`;
+            }
+        };
+
+        window.onload = () => {
+            applyTheme();
+            render();
+            
+            setInterval(() => {
+                const colors = ["#FFD700", "#00F5FF", "#FF10F0", "#7C3AED"];
+                const step = Math.floor(Date.now() / 3000) % colors.length;
+                document.documentElement.style.setProperty('--cycle-color', colors[step]);
+            }, 3000);
+        };
+    </script>
+</body>
+</html>
